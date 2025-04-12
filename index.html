@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Forth Console</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #fefefe;
+      color: #000;
+      padding: 2em;
+    }
+    textarea {
+      width: 100%;
+      font-size: 1em;
+      height: 300px;
+      padding: 0.5em;
+      background: #eee;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+  <h2>Mini Forth Console</h2>
+  <textarea id="console" placeholder="Welcome to the Forth mini console..."></textarea>
+  <input type="file" id="fileInput" style="display:none" />
+
+  <script>
+    let stack = [];
+    const userWords = {};
+    const variables = {};
+    const consoleEl = document.getElementById("console");
+
+    const commandHistory = [];
+    let historyIndex = -1;
+    let loopIndexStack = [];
+
+    let isDefining = false;
+    let currentWord = '';
+    let currentDefinition = [];
+
+    const words = {
+      '+': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); },
+      '-': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); },
+      '*': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); },
+      '/': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a / b); },
+      '.': () => {
+        const val = stack.pop();
+        if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
+          appendToConsole(val.slice(1, -1));
+        } else {
+          appendToConsole(val);
+        }
+      },
+      'dup': () => stack.push(stack[stack.length - 1]),
+      'drop': () => stack.pop(),
+      'swap': () => { const a = stack.pop(), b = stack.pop(); stack.push(a, b); },
+      'over': () => stack.push(stack[stack.length - 2]),
+      '>': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a > b ? 1 : 0); },
+      '<': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a < b ? 1 : 0); },
+      '=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a === b ? 1 : 0); },
+      '!=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a !== b ? 1 : 0); },
+      'i': () => {
+        if (loopIndexStack.length > 0) {
+          stack.push(loopIndexStack[loopIndexStack.length - 1]);
+        } else {
+          appendToConsole("Error: 'i' used outside a loop.\n");
+        }
+      },
+      'leave': () => { throw 'LEAVE'; },
+      'words': () => {
+        const allWords = Object.keys(words).concat(Object.keys(userWords));
+        appendToConsole(allWords.join(' '));
+      },
+      'clearwords': () => {
+        localStorage.removeItem('forthUserWords');
+        Object.keys(userWords).forEach(k => delete userWords[k]);
+        appendToConsole("Custom words cleared.\n");
+      },
+      'forget': (token, tokens, i) => {
+        const wordToForget = tokens[i + 1];
+        if (userWords.hasOwnProperty(wordToForget)) {
+          delete userWords[wordToForget];
+          saveUserWords();
+          appendToConsole(`Word "${wordToForget}" forgotten.`);
+        } else {
+          appendToConsole(`Word "${wordToForget}" not found.`);
+        }
+        return i + 1;
+      },
+      'variable': (token, tokens, i) => {
+        const varName = tokens[i + 1];
+        variables[varName] = 0;
+        return i + 1;
+      },
+      '@': () => {
+        const varName = stack.pop();
+        if (variables.hasOwnProperty(varName)) {
+          stack.push(variables[varName]);
+        } else {
+          appendToConsole(`Variable "${varName}" not defined\n`);
+        }
+      },
+      '!': () => {
+        const varName = stack.pop();
+        const value = stack.pop();
+        if (variables.hasOwnProperty(varName)) {
+          variables[varName] = value;
+        } else {
+          appendToConsole(`Variable "${varName}" not defined\n`);
+        }
+      },
+      '?': () => {
+        const varName = stack.pop();
+        const userInput = prompt(`Enter value for ${varName}:`);
+        const value = isNaN(userInput) ? userInput : Number(userInput);
+        if (variables.hasOwnProperty(varName)) {
+          variables[varName] = value;
+        } else {
+          appendToConsole(`Variable "${varName}" not defined\n`);
+        }
+      },
+      'save': () => {
+        downloadUserWords();
+      },
+      'load': () => {
+        document.getElementById('fileInput').click();
+      }
+    };
+
+    function appendToConsole(text) {
+      consoleEl.value += '\n→ ' + text;
+    }
+
+    function saveUserWords() {
+      localStorage.setItem('forthUserWords', JSON.stringify(userWords));
+    }
+
+    function loadUserWords() {
+      const saved = localStorage.getItem('forthUserWords');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          for (const [name, value] of Object.entries(parsed)) {
+            userWords[name] = Array.isArray(value)
+              ? value.map(String)
+              : value.trim().split(/\s+/);
+          }
+          consoleEl.value +="Custom words loaded.\n";
+        } catch (e) {
+          consoleEl.value +="Error loading custom words.\n";
+        }
+      }
+    }
+
+    function downloadUserWords() {
+      const data = JSON.stringify(userWords, null, 2);
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'forth_words.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function uploadUserWords(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          for (const [name, value] of Object.entries(parsed)) {
+            userWords[name] = Array.isArray(value)
+              ? value.map(String)
+              : value.trim().split(/\s+/);
+          }
+          consoleEl.value +="Words loaded from file.\n";
+        } catch (e) {
+          consoleEl.value +="Error in loaded file.\n";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      if (e.target.files.length > 0) {
+        uploadUserWords(e.target.files[0]);
+      }
+    });
+
+    window.addEventListener('load', () => {
+      consoleEl.value='';
+      loadUserWords();
+    });
+
+    function interpretLine(line) {
+      const tokens = [...line.matchAll(/"[^"]*"|\S+/g)].map(match => match[0]);
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (isDefining) {
+          if (token === ';') {
+            userWords[currentWord] = [...currentDefinition];
+            saveUserWords();
+            appendToConsole(`word ${currentWord} defined.`);
+            isDefining = false;
+            currentWord = '';
+            currentDefinition = [];
+          } else {
+            currentDefinition.push(token);
+          }
+          continue;
+        }
+
+        if (token === ':') {
+          isDefining = true;
+          currentWord = tokens[++i];
+          continue;
+        }
+
+        if (!isNaN(token)) {
+          stack.push(Number(token));
+        } else if (words[token]) {
+          try {
+            const result = words[token](token, tokens, i);
+            if (typeof result === 'number') {
+              i = result;
+            }
+          } catch (err) {
+            if (err === 'LEAVE') break;
+            appendToConsole(`Error in "${token}"`);
+            break;
+          }
+        } else if (token === 'if') {
+          const condition = stack.pop();
+          let trueBranch = [], falseBranch = [];
+          i++;
+          while (tokens[i] !== 'else' && tokens[i] !== 'then' && i < tokens.length) {
+            trueBranch.push(tokens[i++]);
+          }
+          if (tokens[i] === 'else') {
+            i++;
+            while (tokens[i] !== 'then' && i < tokens.length) {
+              falseBranch.push(tokens[i++]);
+            }
+          }
+          if (tokens[i] === 'then') i++;
+          const branch = condition ? trueBranch : falseBranch;
+          interpretLine(branch.join(' '));
+        } else if (token === 'do') {
+          const limit = stack.pop();
+          const start = stack.pop();
+          let loopBody = [];
+          i++;
+          while (tokens[i] !== 'loop' && i < tokens.length) {
+            loopBody.push(tokens[i++]);
+          }
+          for (let j = start; j < limit; j++) {
+            loopIndexStack.push(j);
+            try {
+              interpretLine(loopBody.join(' '));
+            } catch (err) {
+              if (err === 'LEAVE') {
+                loopIndexStack.pop();
+                break;
+              } else {
+                throw err;
+              }
+            }
+            loopIndexStack.pop();
+          }
+        } else if (token === 'for') {
+          const count = stack.pop();
+          let loopBody = [];
+          i++;
+          while (tokens[i] !== 'next' && i < tokens.length) {
+            loopBody.push(tokens[i++]);
+          }
+          for (let j = 0; j < count; j++) {
+            loopIndexStack.push(j);
+            try {
+              interpretLine(loopBody.join(' '));
+            } catch (err) {
+              if (err === 'LEAVE') {
+                loopIndexStack.pop();
+                break;
+              } else {
+                throw err;
+              }
+            }
+            loopIndexStack.pop();
+          }
+        } else if (userWords[token]) {
+          interpretLine(userWords[token].join(' '));
+        } else {
+          stack.push(token);
+        }
+      }
+    }
+
+    consoleEl.addEventListener('keydown', function(e) {
+      const lines = consoleEl.value.split('\n');
+      const currentLine = lines[lines.length - 1];
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const cmd = currentLine.trim();
+
+        if (cmd.length > 0) {
+          commandHistory.push(cmd);
+          historyIndex = commandHistory.length;
+          interpretLine(cmd);
+          consoleEl.value += '\n';
+        } else {
+          consoleEl.value += '\n';
+        }
+
+        setTimeout(() => {
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+        }, 0);
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          historyIndex--;
+          replaceLastLine(commandHistory[historyIndex]);
+        }
+      }
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+          historyIndex++;
+          replaceLastLine(commandHistory[historyIndex]);
+        } else {
+          replaceLastLine('');
+        }
+      }
+    });
+
+    function replaceLastLine(newLine) {
+      const lines = consoleEl.value.split('\n');
+      lines[lines.length - 1] = newLine;
+      consoleEl.value = lines.join('\n');
+    }
+  </script>
+</body>
+</html>
