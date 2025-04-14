@@ -82,7 +82,7 @@
           appendToConsole(val);
         }
       },
-      'dup': () => stack.push(stack[stack.length - 1]),
+      'dup': () => { const b = stack[stack.length - 1]; stack.push(b); },
       'drop': () => stack.pop(),
       'swap': () => { const a = stack.pop(), b = stack.pop(); stack.push(a, b); },
       'over': () => stack.push(stack[stack.length - 2]),
