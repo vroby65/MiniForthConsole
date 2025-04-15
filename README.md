@@ -15,7 +15,7 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 
 - Arithmetic: `+ - * /`
 - Stack manipulation: `dup drop swap over`
-- Comparisons: `= != > <`
+- Comparisons: `= != <> > < <= >=`
 - Loops: `do ... loop`, `for ... next` (with `i`, `leave`)
 - Conditionals: `if ... else ... then`
 - Variables: `variable`, `@`, `!`, `?`
@@ -27,6 +27,7 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 - Save/load definitions (`save`, `load`)
 - Persistent storage via browser localStorage
 - Run raw JavaScript: `"alert('hi')" js`
+- Words case insensitive
 - **Retro terminal look**: green-on-black
 - **Fully responsive**, works great on desktop and mobile
 
