@@ -111,7 +111,10 @@
       },
       '>': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a > b ? 1 : 0); },
       '<': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a < b ? 1 : 0); },
+      '>=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a >= b ? 1 : 0); },
+      '<=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a <= b ? 1 : 0); },
       '=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a === b ? 1 : 0); },
+      '<>': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a !== b ? 1 : 0); },
       '!=': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a !== b ? 1 : 0); },
       'i': () => {
         if (loopIndexStack.length > 0) {
@@ -258,7 +261,10 @@
       const tokens = [...line.matchAll(/"[^"]*"|\S+/g)].map(match => match[0]);
 
       for (let i = 0; i < tokens.length; i++) {
-        const token = tokens[i];
+        let token = tokens[i];
+        if (!(token.startsWith('"') && token.endsWith('"'))) {
+          token = token.toLowerCase();
+        }
 
         if (isDefining) {
           if (token === ';') {
@@ -308,7 +314,10 @@
           }
           if (tokens[i] === 'then') i++;
           const branch = condition ? trueBranch : falseBranch;
-          interpretLine(branch.join(' '));
+          const remaining = tokens.slice(i);
+          const all = branch.concat(remaining);
+          interpretLine(all.join(' '));
+          break;
         } else if (token === 'do') {
           const limit = stack.pop();
           const start = stack.pop();
