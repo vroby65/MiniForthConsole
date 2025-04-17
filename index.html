@@ -40,6 +40,9 @@
       resize: vertical;
       white-space: pre;
       caret-color: #00ff00;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     @media (max-width: 600px) {
       textarea {
@@ -74,6 +77,10 @@
       '-': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); },
       '*': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); },
       '/': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a / b); },
+      'dup': () => { const b = stack[stack.length - 1]; stack.push(b); },
+      'drop': () => stack.pop(),
+      'swap': () => { const a = stack.pop(), b = stack.pop(); stack.push(a, b); },
+      'over': () => stack.push(stack[stack.length - 2]),
       '.': () => {
         const val = stack.pop();
         if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
@@ -82,10 +89,8 @@
           appendToConsole(val);
         }
       },
-      'dup': () => { const b = stack[stack.length - 1]; stack.push(b); },
-      'drop': () => stack.pop(),
-      'swap': () => { const a = stack.pop(), b = stack.pop(); stack.push(a, b); },
-      'over': () => stack.push(stack[stack.length - 2]),
+      'clr': () => { consoleEl.value='';},
+      'cr': () => { consoleEl.value += '\n'; },
       '.$': () => {
         if (stack.length === 0) {
           appendToConsole("Stack is empty.");
@@ -194,7 +199,7 @@
     };
 
     function appendToConsole(text) {
-      consoleEl.value += '\n→ ' + text;
+      consoleEl.value += ' → ' + text + " OK";
     }
 
     function saveUserWords() {
@@ -268,9 +273,12 @@
 
         if (isDefining) {
           if (token === ';') {
-            userWords[currentWord] = [...currentDefinition];
+            const normalized = currentDefinition.map(tok =>
+              tok.startsWith('"') && tok.endsWith('"') ? tok : tok.toLowerCase()
+            );
+            userWords[currentWord.toLowerCase()] = normalized;
             saveUserWords();
-            appendToConsole(`word ${currentWord} defined.`);
+            appendToConsole(`word ${currentWord.toLowerCase()} defined.`);
             isDefining = false;
             currentWord = '';
             currentDefinition = [];
