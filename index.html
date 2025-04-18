@@ -5,52 +5,66 @@
   <link rel="icon" type="image/svg+xml" href="ok.svg">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Forth Console</title>
-  <style>
-    :root {
-      color-scheme: dark;
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0;
-      font-family: monospace;
-      background-color: #000000;
-      color: #00ff00;
-      padding: 1em;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    h2 {
-      text-align: center;
-      color: #00ff00;
-      margin-bottom: 1em;
-    }
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fira+Code&display=swap');
+
+  :root {
+    color-scheme: dark;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Fira Code', monospace;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1em;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  h2 {
+    text-align: center;
+    color: #4ec98f;
+    margin-bottom: 1em;
+    font-weight: normal;
+  }
+
+  textarea {
+    width: 100%;
+    flex: 1;
+    font-size: 1.6em;
+    height: 60vh;
+    padding: 1em;
+    background-color: #252526;
+    color: #d4d4d4;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    resize: vertical;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    caret-color: #4ec98f;
+    transition: all 0.3s ease;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: #4ec98f;
+    box-shadow: 0 0 0 2px #4ec98f55;
+  }
+
+  @media (max-width: 600px) {
     textarea {
-      width: 100%;
-      flex: 1;
-      font-size: 1.5em;
-      height: 60vh;
-      padding: 1em;
-      background-color: #000000;
-      color: #00ff00;
-      border: 1px solid #00ff00;
-      border-radius: 4px;
-      resize: vertical;
-      white-space: pre;
-      caret-color: #00ff00;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
+      font-size: 1em;
+      padding: 0.75em;
     }
-    @media (max-width: 600px) {
-      textarea {
-        font-size: 1em;
-        padding: 0.75em;
-      }
-    }
-  </style>
+  }
+</style>
 </head>
 <body>
   <h2>Mini Forth Console</h2>
@@ -81,6 +95,10 @@
       'drop': () => stack.pop(),
       'swap': () => { const a = stack.pop(), b = stack.pop(); stack.push(a, b); },
       'over': () => stack.push(stack[stack.length - 2]),
+      'clearstack': () => {
+        stack.length = 0;
+        appendToConsole('Stack cleared.');
+      },
       '.': () => {
         const val = stack.pop();
         if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
@@ -133,10 +151,30 @@
         const allWords = Object.keys(words).concat(Object.keys(userWords));
         appendToConsole(allWords.join(' '));
       },
-      'clearwords': () => {
+      'reset': () => {
         localStorage.removeItem('forthUserWords');
         Object.keys(userWords).forEach(k => delete userWords[k]);
-        appendToConsole("Custom words cleared.\n");
+        Object.keys(variables).forEach(k => delete variables[k]);
+        stack.length = 0;
+        appendToConsole("Environment reset (words + variables + stack).\n");
+      },
+      'alias': (token, tokens, i) => {
+        const newName = tokens[i + 1];
+        const existingName = tokens[i + 2];
+
+        if (words[existingName]) {
+          userWords[newName] = [existingName];
+          saveUserWords();
+          appendToConsole(`Alias "${newName}" for core word "${existingName}" created.`);
+        } else if (userWords[existingName]) {
+          userWords[newName] = [...userWords[existingName]];
+          saveUserWords();
+          appendToConsole(`Alias "${newName}" for user word "${existingName}" created.`);
+        } else {
+          appendToConsole(`Word "${existingName}" not found.`);
+        }
+
+        return i + 2;
       },
       'see': (token, tokens, i) => {
         const wordToSee = tokens[i + 1];
@@ -147,20 +185,41 @@
         }
         return i + 1;
       },
-      'forget': (token, tokens, i) => {
-        const wordToForget = tokens[i + 1];
-        if (userWords.hasOwnProperty(wordToForget)) {
-          delete userWords[wordToForget];
-          saveUserWords();
-          appendToConsole(`Word "${wordToForget}" forgotten.`);
+      'edit': (token, tokens, i) => {
+        const wordToSee = tokens[i + 1];
+        if (userWords.hasOwnProperty(wordToSee)) {
+          commandHistory.push(`: ${wordToSee} ${userWords[wordToSee].join(' ')} ;`);
+          setTimeout(() => {
+            replaceLastLine(commandHistory[historyIndex]);
+          },10);  
         } else {
-          appendToConsole(`Word "${wordToForget}" not found.`);
+          appendToConsole(`Word "${wordToSee}" not found.`);
+        }
+        return i + 1;
+      },
+      'forget': (token, tokens, i) => {
+        const name = tokens[i + 1];
+        let found = false;
+        if (userWords.hasOwnProperty(name)) {
+          delete userWords[name];
+          saveUserWords();
+          appendToConsole(`Word "${name}" forgotten.`);
+          found = true;
+        }
+        if (variables.hasOwnProperty(name)) {
+          delete variables[name];
+          appendToConsole(`Variable "${name}" deleted.`);
+          found = true;
+        }
+        if (!found) {
+          appendToConsole(`Name "${name}" not found.`);
         }
         return i + 1;
       },
       'variable': (token, tokens, i) => {
-        const varName = tokens[i + 1];
+        const varName = tokens[i + 1].toLowerCase();
         variables[varName] = 0;
+        appendToConsole(`variable ${varName} created.`);
         return i + 1;
       },
       '@': () => {
@@ -176,6 +235,7 @@
         const value = stack.pop();
         if (variables.hasOwnProperty(varName)) {
           variables[varName] = value;
+          appendToConsole(`set "${varName}"`);
         } else {
           appendToConsole(`Variable "${varName}" not defined\n`);
         }
@@ -203,7 +263,11 @@
     }
 
     function saveUserWords() {
-      localStorage.setItem('forthUserWords', JSON.stringify(userWords));
+      const data = {
+        words: userWords,
+        variables: variables
+      };
+      localStorage.setItem('forthUserWords', JSON.stringify(data));
     }
 
     function loadUserWords() {
@@ -211,24 +275,34 @@
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          for (const [name, value] of Object.entries(parsed)) {
-            userWords[name] = Array.isArray(value)
-              ? value.map(String)
-              : value.trim().split(/\s+/);
+          if (parsed.words) {
+            for (const [name, value] of Object.entries(parsed.words)) {
+              userWords[name] = Array.isArray(value)
+                ? value.map(String)
+                : value.trim().split(/\s+/);
+            }
+          }
+          if (parsed.variables) {
+            for (const [name, value] of Object.entries(parsed.variables)) {
+              variables[name] = value;
+            }
           }
         } catch (e) {
-          consoleEl.value +="Error loading custom words.\n";
+          consoleEl.value += "Error loading saved environment.\n";
         }
       }
     }
-
+    
     function downloadUserWords() {
-      const data = JSON.stringify(userWords, null, 2);
-      const blob = new Blob([data], { type: 'application/json' });
+      const data = {
+        words: userWords,
+        variables: variables
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'forth_words.json';
+      a.download = 'forth_environment.json';
       a.click();
       URL.revokeObjectURL(url);
     }
@@ -238,14 +312,22 @@
       reader.onload = function(e) {
         try {
           const parsed = JSON.parse(e.target.result);
-          for (const [name, value] of Object.entries(parsed)) {
-            userWords[name] = Array.isArray(value)
-              ? value.map(String)
-              : value.trim().split(/\s+/);
+          if (parsed.words) {
+            for (const [name, value] of Object.entries(parsed.words)) {
+              userWords[name] = Array.isArray(value)
+                ? value.map(String)
+                : value.trim().split(/\s+/);
+            }
           }
-          consoleEl.value +="Words loaded from file.\n";
+          if (parsed.variables) {
+            for (const [name, value] of Object.entries(parsed.variables)) {
+              variables[name] = value;
+            }
+          }
+          saveUserWords(); // aggiorna anche localStorage
+          consoleEl.value += "Environment loaded from file.\n";
         } catch (e) {
-          consoleEl.value +="Error in loaded file.\n";
+          consoleEl.value += "Error loading environment from file.\n";
         }
       };
       reader.readAsText(file);
