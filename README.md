@@ -18,17 +18,19 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 - Comparisons: `= != <> > < <= >=`
 - Loops: `do ... loop`, `for ... next` (with `i`, `leave`)
 - Conditionals: `if ... else ... then`
-- Variables: `variable`, `@`, `!`, `?`
+- Variables: `variable`, `@`, `!`, `?`, `var`, `const`
 - User-defined words: `: wordname ... ;`
-- Built-in word listing: `words`, `forget`, `clearwords`
+- Aliases: `alias newname existingword`
+- Persistent variables and words (`localStorage`)
+- Full reset: `reset` clears words, variables, and stack
 - Stack inspection: `.$`
 - Variable inspection: `.v`
-- Word source inspection: `see wordname`
-- Save/load definitions (`save`, `load`)
-- Persistent storage via browser localStorage
+- Word source inspection: `see wordname`, `edit wordname`
+- Forget a name (word or variable): `forget name`
+- Save/load definitions and variables: `save`, `load`
 - Run raw JavaScript: `"alert('hi')" js`
 - Words case insensitive
-- **Retro terminal look**: green-on-black
+- **Retro terminal look** (customizable)
 - **Fully responsive**, works great on desktop and mobile
 
 ---
@@ -51,7 +53,7 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 You should see:
 
 ```
-→ 7
+→ 7 OK
 ```
 
 ---
@@ -74,10 +76,15 @@ You should see:
 ### 🧠 Variables
 
 ```forth
-variable x     \ define a variable
+var x          \ define a variable (alias of `variable`)
 42 x !         \ store 42 into x
 x @ .          \ prints 42
 x ?            \ prompt user to enter a value
+```
+
+```forth
+42 answer const
+answer @ .     \ prints 42
 ```
 
 ### 🔁 Conditionals
@@ -100,11 +107,12 @@ x ?            \ prompt user to enter a value
 5 square .         \ prints 25
 ```
 
-Manage words:
+### 📎 Aliases
 
-- List all: `words`  
-- Remove one: `forget wordname`  
-- Clear all custom: `clearwords`
+```forth
+alias sqr square
+5 sqr .            \ also prints 25
+```
 
 ---
 
@@ -152,6 +160,18 @@ see square
 
 ---
 
+## 🧹 Management Commands
+
+- List all words: `words`
+- View variables: `.v`
+- Forget a name (word or variable): `forget name`
+- Reset everything (stack, vars, words): `reset`
+- Clear screen: `clr`
+- Save definitions & variables to file: `save`
+- Load from file: `load`
+
+---
+
 ## 🧪 JavaScript Execution
 
 Run raw JavaScript in the browser using `"your_code"` `js`:
@@ -167,30 +187,31 @@ Other examples:
 "document.title" js .    \ prints page title
 ```
 
-> ⚠️ Be cautious: `js` executes arbitrary code in the browser context. Use in trusted environments only.
+> ⚠️ Use with caution: `js` executes arbitrary code in browser context.
 
 ---
 
 ## 💾 Save & Load
 
-- Type `save` to download your current words as `forth_words.json`
-- Type `load` to import previously saved definitions
-- Definitions are also auto-saved in local storage
+- `save` downloads both words and variables as `forth_environment.json`
+- `load` imports them from file
+- Environment is also saved automatically in browser `localStorage`
 
 ---
 
 ## 🎨 UI & Style
 
-- Green-on-black retro terminal aesthetic
-- Monospaced font, large text
-- Smooth, responsive layout
+- Modern dark-mode terminal aesthetic (customizable)
+- Monospaced font, responsive layout
+- Smooth behavior and easy keyboard input
+- Works fully offline
 - No dependencies — fully self-contained
 
 ---
 
 ## 🌐 Hosting
 
-This project is fully client-side and perfect for GitHub Pages:
+Perfect for GitHub Pages:
 
 1. Push to your GitHub repository  
 2. Enable Pages in repo settings  
@@ -211,3 +232,5 @@ Created with ❤️ by **vroby65**
 ---
 
 Happy Forth-ing! 🤖
+```
+
