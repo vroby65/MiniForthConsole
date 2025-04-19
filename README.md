@@ -18,7 +18,7 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 - Comparisons: `= != <> > < <= >=`
 - Loops: `do ... loop`, `for ... next` (with `i`, `leave`)
 - Conditionals: `if ... else ... then`
-- Variables: `variable`, `@`, `!`, `?`, `var`, `const`
+- Variables: `variable`, `@`, `!`, `*`, `*@`, `*!`
 - User-defined words: `: wordname ... ;`
 - Aliases: `alias newname existingword`
 - Persistent variables and words (`localStorage`)
@@ -30,8 +30,10 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 - Save/load definitions and variables: `save`, `load`
 - Run raw JavaScript: `"alert('hi')" js`
 - Words case insensitive
-- **Retro terminal look** (customizable)
-- **Fully responsive**, works great on desktop and mobile
+- Special command: `.*` to repeat instructions until the stack is empty
+- `clr` to clear screen, `cr` for newline
+- Retro terminal look (customizable)
+- Fully responsive, works great on desktop and mobile
 
 ---
 
@@ -39,7 +41,7 @@ Try it live: [https://vroby65.github.io/MiniForthConsole/](https://vroby65.githu
 
 1. Clone or download this repository:
    ```bash
-   git clone https://github.com/yourusername/mini-forth-console.git
+   git clone https://github.com/vroby65/MiniForthConsole.git
    ```
 
 2. Open `index.html` in your browser.
@@ -67,7 +69,7 @@ You should see:
 15 5 / .       \ prints 3
 ```
 
-### 🌀 Stack Manipulation
+### 🔀 Stack Manipulation
 
 ```forth
 1 2 swap . .   \ prints 1 then 2
@@ -76,24 +78,59 @@ You should see:
 ### 🧠 Variables
 
 ```forth
-var x          \ define a variable (alias of `variable`)
-42 x !         \ store 42 into x
-x @ .          \ prints 42
-x ?            \ prompt user to enter a value
+variable x      \ define a variable
+42 x !          \ store 42 into x
+x @ .           \ prints 42
 ```
 
 ```forth
-42 answer const
-answer @ .     \ prints 42
+array myarr     \ define an array
+10 20 30 myarr *!  \ store stack into array
+myarr *@        \ push array elements back to stack
 ```
 
-### 🔁 Conditionals
+### 🔀 Stack Display
+
+```forth
+1 "hello" 42
+.$
+```
+
+```
+→ [2: 42]
+[1: "hello"]
+[0: 1]
+```
+
+### 📋 Variables Display
+
+```forth
+.v
+```
+
+```
+→ [x : 42]
+[myarr : [10, 20, 30]]
+```
+
+### 👁️ Word Inspection
+
+```forth
+: square dup * ;
+see square
+```
+
+```
+→ : square dup * ;
+```
+
+### 📊 Conditionals
 
 ```forth
 5 3 > if "greater" else "smaller" then .
 ```
 
-### 🔂 Loops
+### 🔄 Loops
 
 ```forth
 0 5 do i . loop        \ prints 0 1 2 3 4
@@ -107,60 +144,34 @@ answer @ .     \ prints 42
 5 square .         \ prints 25
 ```
 
-### 📎 Aliases
+### 📌 Aliases
 
 ```forth
 alias sqr square
 5 sqr .            \ also prints 25
 ```
 
----
-
-## 🔍 Inspecting State
-
-### 📦 Stack: `.$`
-
-Displays the current stack top-to-bottom:
+### 🤖 Capture Output
 
 ```forth
-1 "hello" 42
+3 4 + $ .
 .$
 ```
 
-```
-→ [2: 42]
-[1: "hello"]
-[0: 1]
-```
+This captures output of `.` and pushes it onto the stack.
 
-### 📋 Variables: `.v`
-
-Lists all defined variables and their values:
+### ✴️ Repeat Until Stack Empty
 
 ```forth
-.v
+1 2 3 4
+.* .
 ```
 
-```
-→ [x: 42]
-[y: "hello"]
-```
-
-### 🔎 Word Source: `see`
-
-Displays the source of a custom word:
-
-```forth
-see square
-```
-
-```
-→ : square dup * ;
-```
+Prints all elements until stack is empty.
 
 ---
 
-## 🧹 Management Commands
+## 🪜 Management Commands
 
 - List all words: `words`
 - View variables: `.v`
@@ -172,9 +183,9 @@ see square
 
 ---
 
-## 🧪 JavaScript Execution
+## 📊 JavaScript Execution
 
-Run raw JavaScript in the browser using `"your_code"` `js`:
+Run raw JavaScript in the browser using `"your_code" js`:
 
 ```forth
 "alert('Hello from Forth!')" js
@@ -232,5 +243,3 @@ Created with ❤️ by **vroby65**
 ---
 
 Happy Forth-ing! 🤖
-```
-
