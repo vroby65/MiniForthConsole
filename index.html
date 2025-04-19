@@ -76,6 +76,8 @@
     const userWords = {};
     const variables = {};
     const consoleEl = document.getElementById("console");
+    const awaitingInput = false;
+    const awaitingVarName = "";
 
     const commandHistory = [];
     let historyIndex = -1;
@@ -84,9 +86,10 @@
     let isDefining = false;
     let currentWord = '';
     let currentDefinition = [];
+    let captureOutput = false;
 
     const words = {
-      'js': () => { stack.push(eval(stack.pop().slice(1,-1))) },
+      'js': () => { eval(stack.pop().slice(1,-1)) },
       '+': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a + b); },
       '-': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a - b); },
       '*': () => { const b = stack.pop(); const a = stack.pop(); stack.push(a * b); },
@@ -99,6 +102,9 @@
         stack.length = 0;
         appendToConsole('Stack cleared.');
       },
+      '$': () => {captureOutput= true;},
+      'clr': () => { consoleEl.value='';},
+      'cr': () => { consoleEl.value += '\n'; },
       '.': () => {
         const val = stack.pop();
         if (typeof val === 'string' && val.startsWith('"') && val.endsWith('"')) {
@@ -107,8 +113,24 @@
           appendToConsole(val);
         }
       },
-      'clr': () => { consoleEl.value='';},
-      'cr': () => { consoleEl.value += '\n'; },
+      '.*': (token, tokens, i) => {
+        const loopBody = tokens.slice(i + 1); // tutti i comandi dopo .*
+
+        if (loopBody.length === 0) {
+          appendToConsole(`Errore: nessun comando dopo .*`);
+          return i;
+        }
+
+        try {
+          while (stack.length > 0) {
+            interpretLine(loopBody.join(' '));
+          }
+        } catch (err) {
+          appendToConsole(`Errore in .*: ${err}`);
+        }
+
+        return tokens.length; // salta tutti i token restanti
+      },
       '.$': () => {
         if (stack.length === 0) {
           appendToConsole("Stack is empty.");
@@ -128,7 +150,14 @@
         if (names.length === 0) {
           appendToConsole("No variables defined.");
         } else {
-          const lines = names.map(name => `[ ${name} : ${variables[name]} ]`);
+          const lines = names.map(name => {
+            const value = variables[name];
+            if (Array.isArray(value)) {
+              return `[ ${name} : [ ${value.map(v => typeof v === 'string' ? `"${v}"` : v).join(', ')} ] ]`;
+            } else {
+              return `[ ${name} : ${typeof value === 'string' ? `"${value}"` : value} ]`;
+            }
+          });
           appendToConsole(lines.join('\n'));
         }
       },
@@ -200,6 +229,7 @@
       'forget': (token, tokens, i) => {
         const name = tokens[i + 1];
         let found = false;
+        
         if (userWords.hasOwnProperty(name)) {
           delete userWords[name];
           saveUserWords();
@@ -220,34 +250,79 @@
         const varName = tokens[i + 1].toLowerCase();
         variables[varName] = 0;
         appendToConsole(`variable ${varName} created.`);
+        saveUserWords();
+        return i + 1;
+      },
+      'array': (token, tokens, i) => {
+        const name = tokens[i + 1];
+        variables[name]=[];
+
+        saveUserWords();
+        appendToConsole(`Array "${name}" defined.`);
         return i + 1;
       },
       '@': () => {
-        const varName = stack.pop();
-        if (variables.hasOwnProperty(varName)) {
-          stack.push(variables[varName]);
+        const name = stack.pop();
+        const maybeIndex = stack[stack.length - 1]; // guardo senza togliere
+        const value = variables[name];
+
+        if (Array.isArray(value) && typeof maybeIndex === 'number') {
+          const index = stack.pop(); // ora lo tolgo davvero
+          stack.push(value[index]);
+        } else if (variables.hasOwnProperty(name)) {
+          stack.push(value);
         } else {
-          appendToConsole(`Variable "${varName}" not defined\n`);
+          appendToConsole(`Variabile o array "${name}" non definito\n`);
         }
       },
       '!': () => {
-        const varName = stack.pop();
-        const value = stack.pop();
-        if (variables.hasOwnProperty(varName)) {
-          variables[varName] = value;
-          appendToConsole(`set "${varName}"`);
+        const name = stack.pop();
+        const maybeIndex = stack[stack.length - 2]; // penultimo elemento
+        const value = variables[name];
+
+        if (Array.isArray(value) && typeof maybeIndex === 'number') {
+          const index = stack.pop();
+          const val = stack.pop();
+          value[index] = val;
+          saveUserWords();
+          appendToConsole(`set "${name}"[${index}]`);
+        } else if (variables.hasOwnProperty(name)) {
+          const val = stack.pop();
+          variables[name] = val;
+          saveUserWords();
+          appendToConsole(`set "${name}"`);
         } else {
-          appendToConsole(`Variable "${varName}" not defined\n`);
+          appendToConsole(`Variabile o array "${name}" non definito\n`);
         }
       },
-      '?': () => {
+      '*!': () => {
         const varName = stack.pop();
-        const userInput = prompt(`Enter value for ${varName}:`);
-        const value = isNaN(userInput) ? userInput : Number(userInput);
         if (variables.hasOwnProperty(varName)) {
-          variables[varName] = value;
+          if (!Array.isArray(variables[varName])) {
+            appendToConsole(`"${varName}" non è un array\n`);
+            return;
+          }
+          variables[varName] = stack.splice(0, stack.length); // svuota lo stack
+          saveUserWords();
+          appendToConsole(`set "${varName}"`);
         } else {
-          appendToConsole(`Variable "${varName}" not defined\n`);
+          appendToConsole(`array "${varName}" non definito\n`);
+        }
+      },
+      '*@': () => {
+        const varName = stack.pop();
+        if (variables.hasOwnProperty(varName)) {
+          if (!Array.isArray(variables[varName])) {
+            appendToConsole(`"${varName}" non è un array\n`);
+            return;
+          }
+          const arr = variables[varName];
+          for (let i = 0; i < arr.length; i++) {
+            stack.push(arr[i]);
+          }
+          appendToConsole(`array "${varName}" caricato nello stack`);
+        } else {
+          appendToConsole(`array "${varName}" non definito\n`);
         }
       },
       'save': () => {
@@ -259,7 +334,15 @@
     };
 
     function appendToConsole(text) {
-      consoleEl.value += ' → ' + text + " OK";
+      if (captureOutput) {
+        // rimuove " → " iniziale e " OK" finale se ci sono
+        let cleaned = text.replace(/^ *→ */, '').replace(/ *OK$/, '');
+        const tokens = cleaned.split(/\s+/);
+        tokens.reverse().forEach(t => stack.push(t));
+        captureOutput = false;
+      } else {
+        consoleEl.value += ' → ' + text + " OK";
+      }
     }
 
     function saveUserWords() {
@@ -342,6 +425,7 @@
     window.addEventListener('load', () => {
       consoleEl.value='';
       loadUserWords();
+      consoleEl.focus();
     });
 
     function interpretLine(line) {
@@ -466,7 +550,7 @@
       if (e.key === 'Enter') {
         e.preventDefault();
         const cmd = currentLine.trim();
-
+        
         if (cmd.length > 0) {
           commandHistory.push(cmd);
           historyIndex = commandHistory.length;
